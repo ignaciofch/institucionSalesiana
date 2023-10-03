@@ -60,7 +60,7 @@ def es_model(nombre_archivo) :
 def es_msdb(nombre_archivo) :
     return ("msdb_") in nombre_archivo
 
-#valida fecha para crear el nombre de la nueva carpeta de la forma: "AAAMMDD"
+#valida fecha para que siempre tenga 2 digitos
 def valida_fecha(fecha: str) -> str :
     fecha_valida: str
     if len(fecha) == 1 :
@@ -69,9 +69,48 @@ def valida_fecha(fecha: str) -> str :
         fecha_valida = fecha
     return fecha_valida
 
+#Extraer el año, mes y día de una fecha, las valida y crear el nombre de una
+#carpeta backup para agregar a un diccionario
+def crea_nombres_carpeta_segun_el_dia(fecha_de_hoy) :
+    diccionario_por_dia = {} 
+    dia_variante = 1
+
+    while dia_variante <= 3 :
+        fecha: datetime = fecha_de_hoy - timedelta(days=dia_variante)
+        mes = str(fecha.month)
+        dia = str(fecha.day)
+        año_valido = str(fecha.year)
+        mes_valido = valida_fecha(mes)
+        dia_valido = valida_fecha(dia)
+        nombre_carpeta_nueva = año_valido + mes_valido + dia_valido
+        
+        diccionario_por_dia[dia_variante] = nombre_carpeta_nueva
+
+        dia_variante += 1
+
+    return diccionario_por_dia
+
+#devuelve el par [dia, mes] con n dias de antiguedad respecto a la fecha de hoy
+def n_dias_antes(n, fecha_de_hoy) -> list:
+    dia_mes = []
+
+    fecha: datetime = fecha_de_hoy - timedelta(days=n)
+    mes = str(fecha.month)
+    dia = str(fecha.day)
+    mes_valido = valida_fecha(mes)
+    dia_valido = valida_fecha(dia)
+
+    dia_mes.append(dia_valido)
+    dia_mes.append(mes_valido)
+
+    return dia_mes
+
+
 #selecciona solo los archivos que tienen la fecha de ayer y los agrega a una lista
-def selecciona_archivos_con_fecha_de_ayer(lista_de_listas, dia, mes) -> list :
+def selecciona_archivos_con_fecha_de(lista_de_listas, par_dia_mes) -> list :
     lista_bkp_recientes = []
+    dia = par_dia_mes[0]
+    mes = par_dia_mes[1]
 
     for lista_de_una_base in lista_de_listas:
         lista_de_una_base: list
@@ -90,28 +129,30 @@ def pega_archivos_faltantes(ruta_original, ruta_destino, archivos_a_copiar, carp
         for archivo in archivos_a_copiar:
             shutil.copy(ruta_original + archivo, ruta_destino + nombre_carpeta + "\\") 
 
+
+
 # Obtener la fecha de ayer
 fecha_actual = datetime.now()
-fecha_ayer = fecha_actual - timedelta(days=1)
-
-# Extraer el año, mes y día de la fecha de ayer y validarlas
-mes = str(fecha_ayer.month)
-dia = str(fecha_ayer.day)
-año_valido = str(fecha_ayer.year)
-mes_valido = valida_fecha(mes)
-dia_valido = valida_fecha(dia)
 
 #Declaro las variables de las rutas de las carpetas de orgine y destino,
 #nombre de la carpeta a crear y lista de todos los archivos bakcup
 
+nombre_carpeta_correspondiente = crea_nombres_carpeta_segun_el_dia(fecha_actual)
+
 ruta_sql = "G:\\bkp_automatico_test\\"
 ruta_admtar = "\\\\10.0.1.14\\ÚltimoAdmTar\\"
-nombre_carpeta_nueva = año_valido + mes_valido + dia_valido
 lista_todos_archivos_bak = os.listdir(ruta_sql)
 carpetas_bkp_existentes = os.listdir(ruta_admtar)
+#para test: lista_todos_archivos_bak = ['cwSGCore_backup_2023_09_27_231501_6803011.bak', 'master_backup_2023_09_27_231501_6803011.bak', 'cwSGCore_backup_2023_09_28_231501_6803011.bak', 'master_backup_2023_10_02_231501_6803011.bak', 'cwSGCore_backup_2023_09_29_231501_6803011.bak', 'master_backup_2023_09_29_231501_6803011.bak', 'cwSGCore_backup_2023_09_30_231501_6803011.bak', 'master_backup_2023_09_30_231501_6803011.bak', 'cwSGCore_backup_2023_10_01_231501_6803011.bak', 'master_backup_2023_10_01_231501_6803011.bak']
+
 
 archivos_filtrados_por_base = filtra_por_base_de_datos(lista_todos_archivos_bak) 
 
-archivos_a_copiar = selecciona_archivos_con_fecha_de_ayer(archivos_filtrados_por_base, dia_valido, mes_valido)
+archivos_a_copiar_1_dia_antes = selecciona_archivos_con_fecha_de(archivos_filtrados_por_base, n_dias_antes(1, fecha_actual))
+archivos_a_copiar_2_dias_antes = selecciona_archivos_con_fecha_de(archivos_filtrados_por_base, n_dias_antes(2, fecha_actual))
+archivos_a_copiar_3_dias_antes = selecciona_archivos_con_fecha_de(archivos_filtrados_por_base, n_dias_antes(3, fecha_actual))
 
-pega_archivos_faltantes(ruta_sql, ruta_admtar, archivos_a_copiar, carpetas_bkp_existentes, nombre_carpeta_nueva)
+pega_archivos_faltantes(ruta_sql, ruta_admtar, archivos_a_copiar_1_dia_antes, carpetas_bkp_existentes, nombre_carpeta_correspondiente[1])
+pega_archivos_faltantes(ruta_sql, ruta_admtar, archivos_a_copiar_2_dias_antes, carpetas_bkp_existentes, nombre_carpeta_correspondiente[2])
+pega_archivos_faltantes(ruta_sql, ruta_admtar, archivos_a_copiar_3_dias_antes, carpetas_bkp_existentes, nombre_carpeta_correspondiente[3])
+
